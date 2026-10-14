@@ -165,6 +165,8 @@ export const BRIDGE_METHODS = [
 	"network.read",
 	"permission.respond",
 	"permission.allow",
+	"permission.block",
+	"permission.unblock",
 	"permission.setMode",
 	"bridge.reload",
 	"bridge.activate",

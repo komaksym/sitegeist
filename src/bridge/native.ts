@@ -13,7 +13,10 @@ import { BrowserSession, listSessions, NoTabError, pruneSessions } from "../brow
 import {
 	addPendingRequest,
 	allowHost,
+	blockHost,
 	DECISION_KEY_PREFIX,
+	getAllowedHosts,
+	getBlockedHosts,
 	getPermissionMode,
 	hostOf,
 	isBridgeEnabled,
@@ -22,6 +25,7 @@ import {
 	type PermissionMode,
 	removePendingRequest,
 	setPermissionMode,
+	unblockHost,
 } from "./permissions.js";
 import {
 	BRIDGE_METHODS,
@@ -165,7 +169,10 @@ async function askPermission(state: ClientState, url: string): Promise<boolean> 
 	});
 	const result = await decision;
 	await removePendingRequest(requestId);
-	if (result === "allow_host") await allowHost(host);
+	if (result === "allow_host") {
+		await allowHost(host);
+		await unblockHost(host);
+	}
 	return result !== "deny";
 }
 
@@ -266,8 +273,40 @@ function onHostMessage(message: HostToExt): void {
 					});
 					return;
 				}
-				allowHost(host).then(() =>
+				Promise.all([allowHost(host), unblockHost(host)]).then(() =>
 					send({ type: "response", clientId: message.clientId, id: message.id, result: { allowed: host } }),
+				);
+				return;
+			}
+			if (message.method === "permission.block") {
+				const host = String(message.params?.host ?? "").toLowerCase();
+				if (!host) {
+					send({
+						type: "response",
+						clientId: message.clientId,
+						id: message.id,
+						error: { code: ERR.BAD_PARAMS, message: "host is required" },
+					});
+					return;
+				}
+				blockHost(host).then(() =>
+					send({ type: "response", clientId: message.clientId, id: message.id, result: { blocked: host } }),
+				);
+				return;
+			}
+			if (message.method === "permission.unblock") {
+				const host = String(message.params?.host ?? "").toLowerCase();
+				if (!host) {
+					send({
+						type: "response",
+						clientId: message.clientId,
+						id: message.id,
+						error: { code: ERR.BAD_PARAMS, message: "host is required" },
+					});
+					return;
+				}
+				unblockHost(host).then(() =>
+					send({ type: "response", clientId: message.clientId, id: message.id, result: { unblocked: host } }),
 				);
 				return;
 			}
@@ -313,7 +352,8 @@ function onHostMessage(message: HostToExt): void {
 						const options = await chrome.sidePanel.getOptions({ tabId: tab.id }).catch(() => null);
 						return { tabId: tab.id, url: tab.url, groupId: tab.groupId, options };
 					}),
-				]).then(([sessions, perms, panelState, groups, windows, activeTab]) =>
+					Promise.all([getPermissionMode(), getAllowedHosts(), getBlockedHosts()]),
+				]).then(([sessions, perms, panelState, groups, windows, activeTab, sitePermissions]) =>
 					send({
 						type: "response",
 						clientId: message.clientId,
@@ -324,6 +364,11 @@ function onHostMessage(message: HostToExt): void {
 							sidePanel: { ...panelState, activeTab, groups },
 							windows,
 							grantedPermissions: perms.permissions ?? [],
+							sitePermissions: {
+								mode: sitePermissions[0],
+								allowed: sitePermissions[1],
+								blocked: sitePermissions[2],
+							},
 							workerUptimeS: Math.round((Date.now() - WORKER_STARTED_AT) / 1000),
 							log: [...log],
 							clients: [...clients.values()].map((c) => ({

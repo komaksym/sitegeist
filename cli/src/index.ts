@@ -16,6 +16,8 @@ Usage:
   sitegeist status          Show whether the extension is reachable
   sitegeist reload          Reload the extension (picks up a rebuilt dist-chrome)
   sitegeist allow <host>    Allow agents to open a site (subdomains included)
+  sitegeist block <host>    Keep asking before agents open a site, even in yolo mode
+  sitegeist unblock <host>  Remove a site from the blocked list
   sitegeist yolo            Allow agents to open ANY site (no per-site prompts)
   sitegeist ask             Require a prompt before agents open an un-allowed site (default)
   sitegeist debug           Print the extension's bridge state and recent timing log
@@ -81,6 +83,24 @@ async function main(): Promise<void> {
 			const client = new BridgeClient({ name: "allow" });
 			await client.connect();
 			console.log(JSON.stringify(await client.call("permission.allow", { host }, 5000)));
+			client.close();
+			return;
+		}
+		case "block": {
+			const host = process.argv[3];
+			if (!host) throw new Error("usage: sitegeist block <host>");
+			const client = new BridgeClient({ name: "block" });
+			await client.connect();
+			console.log(JSON.stringify(await client.call("permission.block", { host }, 5000)));
+			client.close();
+			return;
+		}
+		case "unblock": {
+			const host = process.argv[3];
+			if (!host) throw new Error("usage: sitegeist unblock <host>");
+			const client = new BridgeClient({ name: "unblock" });
+			await client.connect();
+			console.log(JSON.stringify(await client.call("permission.unblock", { host }, 5000)));
 			client.close();
 			return;
 		}

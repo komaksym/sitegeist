@@ -81,8 +81,10 @@ only tool that changes what you see.
 Site access: by default the extension asks before an agent opens a new site. Claude Code
 and Codex show the prompt inline (MCP elicitation). Otherwise answer it in the side panel
 under Settings > Bridge, run `sitegeist allow <host>`, or switch to "allow any site".
+A blocked host keeps the prompt even in allow-any-site mode (Settings > Bridge, or
+`sitegeist block <host>`); answering "allow from now on" clears the block.
 
-CLI commands: `mcp`, `install`, `status`, `allow <host>`, `reload`, `debug`,
+CLI commands: `mcp`, `install`, `status`, `allow <host>`, `block <host>`, `unblock <host>`, `reload`, `debug`,
 `pi-extension`. See `cli/README.md`.
 
 ## What changed in this fork

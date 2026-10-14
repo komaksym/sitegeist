@@ -30,6 +30,8 @@ it needs no extra step. Reload the extension once after the first install.
 | `sitegeist install [--force]` | write the native host manifest (Chrome, Chromium, Brave, Edge, Arc, Vivaldi, Opera; Linux and Windows too) |
 | `sitegeist status` | is a browser reachable, is the extension connected |
 | `sitegeist allow <host>` | let agents open a site without a prompt (subdomains included) |
+| `sitegeist block <host>` | keep asking before agents open a site, even in yolo mode |
+| `sitegeist unblock <host>` | remove a site from the blocked list |
 | `sitegeist reload` | reload the extension (after rebuilding `dist-chrome`) |
 | `sitegeist debug` | bridge state, recent request timings, Chrome API benchmark |
 | `sitegeist pi-extension` | write `~/.pi/agent/extensions/sitegeist.ts` for pi |
@@ -57,6 +59,8 @@ By default the extension asks before an agent opens a new site. MCP clients that
 elicitation (Claude Code, Codex) show the prompt inline; otherwise answer it in the
 Sitegeist side panel under Settings > Bridge, run `sitegeist allow <host>`, or switch the
 mode to "allow any site" there. pi: set `SITEGEIST_AUTO_ALLOW=1` to auto-approve.
+A blocked host keeps the prompt even in allow-any-site mode (Settings > Bridge, or
+`sitegeist block <host>`); answering "allow from now on" clears the block.
 
 `SITEGEIST_SESSION=<name>` makes a harness re-adopt the same tab group across restarts.
 `SITEGEIST_CLIENT_NAME` overrides the tab group label.

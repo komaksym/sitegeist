@@ -5,11 +5,13 @@
  * Unknown hosts raise a permission request that the harness shows (MCP
  * elicitation) or that the user answers in Settings > Bridge. Mode "allow_all"
  * skips the check for people who trust their harness.
+ * A blocked host always asks again, even in "allow_all" mode.
  */
 
 const ENABLED_KEY = "bridge_enabled";
 const MODE_KEY = "bridge_permission_mode";
 const HOSTS_KEY = "bridge_allowed_hosts";
+const BLOCKED_KEY = "bridge_blocked_hosts";
 const PENDING_KEY = "bridge_pending_requests";
 
 export type PermissionMode = "ask" | "allow_all";
@@ -58,6 +60,22 @@ export async function revokeHost(host: string): Promise<void> {
 	await chrome.storage.local.set({ [HOSTS_KEY]: hosts.filter((h) => h !== host.toLowerCase()) });
 }
 
+export async function getBlockedHosts(): Promise<string[]> {
+	const data = await chrome.storage.local.get(BLOCKED_KEY);
+	return (data[BLOCKED_KEY] as string[] | undefined) ?? [];
+}
+
+export async function blockHost(host: string): Promise<void> {
+	const hosts = await getBlockedHosts();
+	const normalized = host.toLowerCase();
+	if (!hosts.includes(normalized)) await chrome.storage.local.set({ [BLOCKED_KEY]: [...hosts, normalized] });
+}
+
+export async function unblockHost(host: string): Promise<void> {
+	const hosts = await getBlockedHosts();
+	await chrome.storage.local.set({ [BLOCKED_KEY]: hosts.filter((h) => h !== host.toLowerCase()) });
+}
+
 export function hostOf(url: string): string {
 	try {
 		return new URL(url).hostname.toLowerCase();
@@ -72,9 +90,10 @@ export function hostAllowed(host: string, allowed: string[]): boolean {
 }
 
 export async function isUrlAllowed(url: string): Promise<boolean> {
-	if ((await getPermissionMode()) === "allow_all") return true;
 	const host = hostOf(url);
 	if (!host) return url === "about:blank";
+	if (hostAllowed(host, await getBlockedHosts())) return false;
+	if ((await getPermissionMode()) === "allow_all") return true;
 	return hostAllowed(host, await getAllowedHosts());
 }
 

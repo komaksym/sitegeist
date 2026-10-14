@@ -5,7 +5,9 @@ import { html, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import {
 	allowHost,
+	blockHost,
 	getAllowedHosts,
+	getBlockedHosts,
 	getPendingRequests,
 	getPermissionMode,
 	isBridgeEnabled,
@@ -15,6 +17,7 @@ import {
 	revokeHost,
 	setBridgeEnabled,
 	setPermissionMode,
+	unblockHost,
 } from "../bridge/permissions.js";
 import { listSessions } from "../browser/session.js";
 
@@ -28,9 +31,11 @@ export class BridgeTab extends SettingsTab {
 	@state() private enabled = true;
 	@state() private mode: PermissionMode = "ask";
 	@state() private hosts: string[] = [];
+	@state() private blocked: string[] = [];
 	@state() private pending: PendingRequest[] = [];
 	@state() private sessions: Array<{ id: string; label: string; tabs: number }> = [];
 	@state() private newHost = "";
+	@state() private newBlocked = "";
 
 	private storageListener = (_changes: Record<string, chrome.storage.StorageChange>, area: string) => {
 		if (area === "session" || area === "local") this.load();
@@ -55,6 +60,7 @@ export class BridgeTab extends SettingsTab {
 		this.enabled = await isBridgeEnabled();
 		this.mode = await getPermissionMode();
 		this.hosts = await getAllowedHosts();
+		this.blocked = await getBlockedHosts();
 		this.pending = await getPendingRequests();
 		this.sessions = (await listSessions())
 			.filter((s) => s.id.startsWith("bridge-"))
@@ -75,6 +81,18 @@ export class BridgeTab extends SettingsTab {
 		if (!host) return;
 		await allowHost(host);
 		this.newHost = "";
+		await this.load();
+	}
+
+	private async addBlocked() {
+		const host = this.newBlocked
+			.trim()
+			.toLowerCase()
+			.replace(/^https?:\/\//, "")
+			.split("/")[0];
+		if (!host) return;
+		await blockHost(host);
+		this.newBlocked = "";
 		await this.load();
 	}
 
@@ -178,6 +196,45 @@ export class BridgeTab extends SettingsTab {
 							},
 						})}
 						${Button({ size: "sm", variant: "secondary", children: "Add", onClick: () => this.addHost() })}
+					</div>
+				</div>
+
+				<div class="space-y-2">
+					<div class="text-sm font-medium text-foreground">Blocked sites</div>
+					<div class="text-xs text-muted-foreground">Always asks before opening these, even in "allow any site" mode. Subdomains are included; answering "allow from now on" clears the block.</div>
+					${
+						this.blocked.length === 0
+							? html`<div class="text-xs text-muted-foreground">None yet.</div>`
+							: this.blocked.map(
+									(h) => html`
+										<div class="flex items-center justify-between gap-2 text-sm">
+											<span class="font-mono text-foreground">${h}</span>
+											${Button({
+												size: "sm",
+												variant: "ghost",
+												children: "Remove",
+												onClick: async () => {
+													await unblockHost(h);
+													await this.load();
+												},
+											})}
+										</div>
+									`,
+								)
+					}
+					<div class="flex gap-2 items-center">
+						${Input({
+							placeholder: "linkedin.com",
+							value: this.newBlocked,
+							className: "text-sm flex-1",
+							onInput: (e: Event) => {
+								this.newBlocked = (e.target as HTMLInputElement).value;
+							},
+							onKeyDown: (e: KeyboardEvent) => {
+								if (e.key === "Enter") this.addBlocked();
+							},
+						})}
+						${Button({ size: "sm", variant: "secondary", children: "Add", onClick: () => this.addBlocked() })}
 					</div>
 				</div>
 
